@@ -61,6 +61,6 @@ jobs:
         with: 
           images: victormello93/conversao-peso:${{github.run_number}} #repositório de imagens Docker que irá se conectar com Kubernetes
           
-          # Arquivos de manifesto existentes no projeto (na pasta k8s/          
+          # Arquivos de manifesto existentes no projeto (na pasta k8s/)          
           manifests: |
             k8s/deployment.yaml
