@@ -1,0 +1,66 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI-CD
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [ main ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  CI:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+      
+      #Action de autenticação do Dockerhub
+      - name: Docker Login        
+        uses: docker/login-action@v1.10.0
+        with:                              
+          username: ${{secrets.DOCKERHUB_USER }} #Usuário do repositório no Dockerhub
+          password: ${{secrets.DOCKERHUB_PWD }}  #Senha do repositório no Dockerhub
+          
+      #Action de build de imagem Docker
+      - name: Docker Build and Push
+        uses: docker/build-push-action@v2.7.0
+        with:
+          context: ./ #Pasta onde estão os arquivos do projeto com Dockerfile
+          file: ./Dockerfile #Arquivo do Dockerfile          
+          push: true #Envia a imagem buildada para o Dockerhub
+          
+          #Versões do registry            
+          tags: |
+            victormello93/conversao-peso:latest    
+            victormello93/conversao-peso:${{github.run_number}}
+  CD:
+    needs: [CI] #Executa o pipeline CD de forma sequencial. Ou seja, só será executada depois que pipeline CI concluir a execução.
+    runs-on: ubuntu-latest
+    steps:
+      # Action de conexão com Kubernetes      
+      - uses: actions/checkout@v2
+      
+      - name: Kubernetes set context
+        uses: Azure/k8s-set-context@v1.1
+        with:
+          method: kubeconfig #Esse é o padrão para conexão com Kubernetes
+          kubeconfig: ${{secrets.K8S_KUBECONFIG}} #Conteúdo do arquivo de configuração do cluster Kubernetes definida no Digital Ocean. Esse conteúdo também deve ser mantido em segredo
+      
+      # Action de execução do Kubernetes => aplicando os arquivos de manifesto existentes no projeto      
+      - name: Deploy to Kubernetes cluster
+        uses: Azure/k8s-deploy@v1.3
+        with: 
+          images: victormello93/conversao-peso:${{github.run_number}} #repositório de imagens Docker que irá se conectar com Kubernetes
+          
+          # Arquivos de manifesto existentes no projeto (na pasta k8s/          
+          manifests: |
+            k8s/deployment.yaml
